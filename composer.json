@@ -1,5 +1,5 @@
 {
-  "name": "terminal42/contao-mp_forms",
+  "name": "oveleon/contao-mp_forms",
   "description": "mp_forms extension for Contao Open Source CMS",
   "keywords": ["contao", "forms", "multi", "multipage"],
   "type": "contao-module",
@@ -22,6 +22,9 @@
       "sources": {
         "": "system/modules/mp_forms"
       }
+    },
+    "branch-alias": {
+      "dev-master": "4.1.x-dev"
     }
   }
 }

@@ -39,6 +39,13 @@ class MPFormsFormManager
     private $formFieldsPerStep = [];
 
     /**
+     * Array containing step conditions
+     *
+     * @var array
+     */
+    public $stepConditions = [];
+
+    /**
      * True if the manager can handle this form
      *
      * @var bool
@@ -97,7 +104,21 @@ class MPFormsFormManager
      */
     public function getNumberOfSteps()
     {
-        return count(array_keys($this->formFieldsPerStep));
+        $data = $this->getDataOfAllSteps()['submitted'];
+        $steps = 0;
+
+        foreach ($this->stepConditions as $condition) {
+            if (is_null($condition)) {
+                $steps++;
+                continue;
+            }
+
+            if ($condition($data)) {
+                $steps++;
+            }
+        }
+
+        return $steps;
     }
 
     /**
@@ -214,7 +235,19 @@ class MPFormsFormManager
      */
     public function getPreviousStep()
     {
-        $previous = $this->getCurrentStep() - 1;
+        $data = $this->getDataOfAllSteps()['submitted'];
+
+        for ($previous = $this->getCurrentStep() - 2; $previous >= 0; $previous--) {
+            if (is_null($this->stepConditions[$previous])) {
+                break;
+            }
+
+            if ($this->stepConditions[$previous]($data))
+            {
+                $previous++;
+                break;
+            }
+        }
 
         if ($previous < 0) {
             $previous = 0;
@@ -230,7 +263,20 @@ class MPFormsFormManager
      */
     public function getNextStep()
     {
-        $next = $this->getCurrentStep() + 1;
+        $data = $this->getDataOfAllSteps()['submitted'];
+
+        for ($next = $this->getCurrentStep(); count($this->stepConditions) > $next; $next++) {
+            if (is_null($this->stepConditions[$next])) {
+                $next++;
+                break;
+            }
+
+            if ($this->stepConditions[$next]($data))
+            {
+                $next++;
+                break;
+            }
+        }
 
         if ($next > $this->getNumberOfSteps()) {
             $next = $this->getNumberOfSteps();
@@ -620,6 +666,16 @@ class MPFormsFormManager
             $this->formFieldsPerStep[$i][] = $formField;
 
             if ($this->isPageBreak($formField)) {
+                if ($formField->mp_forms_forceCondition) {
+                    $condition = $this->generateCondition($formField->mp_forms_condition);
+
+                    $this->stepConditions[$i] = function ($arrPost) use ($condition) {
+                        return eval($condition);
+                    };
+                } else {
+                    $this->stepConditions[$i] = null;
+                }
+
                 // Set the name on the model, otherwise one has to enter it
                 // in the back end every time
                 $formField->name = $formField->type;
@@ -696,5 +752,13 @@ class MPFormsFormManager
         }
 
         return $extension;
+    }
+
+    private function generateCondition($strCondition)
+    {
+        $strCondition = str_replace('in_array', '@in_array', $strCondition);
+        $strCondition = preg_replace("/\\$([A-Za-z0-9_]+)/u", '$arrPost[\'$1\']', $strCondition);
+
+        return 'return (' . $strCondition . ');';
     }
 }
